@@ -17,7 +17,8 @@ class MainWindow(QMainWindow):
         self.api_key = ""
         self.base_lang = "English"  
         self.learning_lang = "German"  
-        self.db_manager = DatabaseManager(self.learning_lang)  
+        self.db_manager = DatabaseManager(self.learning_lang) 
+        self.initUI()
 
     def initUI(self):
         main_layout = QHBoxLayout()  
