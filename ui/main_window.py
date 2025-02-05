@@ -1,5 +1,6 @@
-from PyQt5.QtWidgets import QMainWindow, QVBoxLayout, QPushButton, QWidget, QScrollArea, QLabel, QTreeWidget, QTreeWidgetItem, QHBoxLayout, QDesktopWidget, QMessageBox
-from PyQt5.QtCore import Qt
+from PySide6.QtWidgets import QMainWindow, QVBoxLayout, QPushButton, QWidget, QScrollArea, QLabel, QTreeWidget, QTreeWidgetItem, QHBoxLayout, QMessageBox
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QGuiApplication
 from ui.add_group import AddGroupWindow
 from ui.add_item import AddItemWindow
 from ui.study import StudyWindow
@@ -23,7 +24,7 @@ class MainWindow(QMainWindow):
     def initUI(self):
         main_layout = QHBoxLayout()  
 
-        
+        # Group Tree
         group_scroll_area = QScrollArea()
         group_scroll_area.setWidgetResizable(True)
         self.group_tree = QTreeWidget()
@@ -33,7 +34,7 @@ class MainWindow(QMainWindow):
         group_scroll_area.setWidget(self.group_tree)
         main_layout.addWidget(group_scroll_area)
 
-        
+        # Item Details
         item_detail_scroll_area = QScrollArea()
         item_detail_scroll_area.setWidgetResizable(True)
         self.item_detail_label = QLabel("No item selected.")
@@ -41,7 +42,7 @@ class MainWindow(QMainWindow):
         item_detail_scroll_area.setWidget(self.item_detail_label)
         main_layout.addWidget(item_detail_scroll_area)
 
-      
+        # Buttons
         button_layout = QVBoxLayout()
         self.add_group_btn = QPushButton("Add Group")
         self.add_group_btn.clicked.connect(self.open_add_group)
@@ -76,24 +77,19 @@ class MainWindow(QMainWindow):
         self.load_groups_from_database()
 
     def centerWindow(self):
-
-        screen_geometry = QDesktopWidget().availableGeometry()
-        screen_center = screen_geometry.center()
-
+        # PySide6获取屏幕信息的新方式
+        screen = QGuiApplication.primaryScreen().availableGeometry()
+        screen_center = screen.center()
 
         self.resize(1000, 750)
-
         window_geometry = self.frameGeometry()
         window_geometry.moveCenter(screen_center)
-
-
         self.move(window_geometry.topLeft())
 
     def load_groups_from_database(self):
         cursor = self.db_manager.connection.cursor()
         cursor.execute("SELECT name FROM groups")
         groups = cursor.fetchall()
-
 
         self.group_tree.clear()
         self.groups = {}
@@ -104,12 +100,10 @@ class MainWindow(QMainWindow):
             self.group_tree.addTopLevelItem(group_item)
             self.groups[group_name] = {"items": []}
 
-
             cursor.execute("SELECT target_lang, base_lang FROM items WHERE group_name = ?", (group_name,))
             items = cursor.fetchall()
             for item in items:
                 target_lang, base_lang = item
-
                 item_widget = QTreeWidgetItem([base_lang])
                 group_item.addChild(item_widget)
                 self.groups[group_name]["items"].append({"target_lang": target_lang, "base_lang": base_lang})

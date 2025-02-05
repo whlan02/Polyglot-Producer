@@ -1,7 +1,8 @@
 import webbrowser
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QLineEdit, QDesktopWidget, QProgressBar, QMessageBox
-from PyQt5.QtGui import QFont
-from PyQt5.QtCore import Qt, QThread
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QLineEdit, QApplication, QProgressBar, QMessageBox
+from PySide6.QtGui import QFont
+from PySide6.QtCore import Qt, QThread, QRect
+from PySide6.QtGui import QGuiApplication
 from core.ai import AIHelper
 import gtts
 import os
@@ -10,6 +11,8 @@ import soundfile as sf
 import json
 import pygame
 import time
+import numpy as np
+import random
 
 language_map = {
     "English": "en",
@@ -56,13 +59,13 @@ class StudyWindow(QDialog):
         self.progress_label.setAlignment(Qt.AlignCenter)
         self.layout.addWidget(self.progress_label)
 
-
-        self.progress_bar = QProgressBar()
-        self.layout.addWidget(self.progress_bar)
+        #delete old progress bar
+        # self.progress_bar = QProgressBar()
+        # self.layout.addWidget(self.progress_bar)
 
 
         self.step1_layout = QVBoxLayout()
-        self.step1_label = QLabel("Listening Practice")
+        self.step1_label = QLabel("Step 1:Listening Practice")
         self.step1_label.setAlignment(Qt.AlignCenter)
         self.step1_layout.addWidget(self.step1_label)
 
@@ -80,7 +83,7 @@ class StudyWindow(QDialog):
 
 
         self.step2_layout = QVBoxLayout()
-        self.step2_label = QLabel("Visual Recall")
+        self.step2_label = QLabel("Step 2:Visual Recall")
         self.step2_label.setAlignment(Qt.AlignCenter)
         self.step2_layout.addWidget(self.step2_label)
 
@@ -94,9 +97,18 @@ class StudyWindow(QDialog):
 
 
         self.step3_layout = QVBoxLayout()
-        self.step3_label = QLabel("Pronunciation Practice")
+        self.step3_label = QLabel("Step 3:Pronunciation Practice")
         self.step3_label.setAlignment(Qt.AlignCenter)
         self.step3_layout.addWidget(self.step3_label)
+
+         # current item label
+        self.current_item_label = QLabel()
+        self.current_item_label.setAlignment(Qt.AlignCenter)
+        self.step3_layout.addWidget(self.current_item_label)
+        # current sentence label
+        self.current_sentence_label = QLabel()
+        self.current_sentence_label.setAlignment(Qt.AlignCenter)
+        self.step3_layout.addWidget(self.current_sentence_label)
 
         self.play_item_audio_btn_2 = QPushButton("Play Item Audio")
         self.play_item_audio_btn_2.clicked.connect(self.play_item_audio)
@@ -120,7 +132,7 @@ class StudyWindow(QDialog):
 
   
         self.step4_layout = QVBoxLayout()
-        self.step4_label = QLabel("Translation Practice")
+        self.step4_label = QLabel("Step 4:Translation Practice")
         self.step4_label.setAlignment(Qt.AlignCenter)
         self.step4_layout.addWidget(self.step4_label)
 
@@ -170,16 +182,13 @@ class StudyWindow(QDialog):
 
     def centerWindow(self):
 
-        screen_geometry = QDesktopWidget().availableGeometry()
-        screen_center = screen_geometry.center()
+        screen = QGuiApplication.primaryScreen().availableGeometry()
+        screen_center = screen.center()
 
 
         self.resize(600, 400)
-
         window_geometry = self.frameGeometry()
         window_geometry.moveCenter(screen_center)
-
-
         self.move(window_geometry.topLeft())
 
     def set_step_visible(self, step):
@@ -199,6 +208,7 @@ class StudyWindow(QDialog):
             self.common_last_step_btn.setVisible(False)
             self.common_next_step_btn.setVisible(True)
             self.common_next_item_btn.setVisible(False)
+            
         elif step == 2:
             for i in range(self.step2_layout.count()):
                 item = self.step2_layout.itemAt(i)
@@ -251,6 +261,7 @@ class StudyWindow(QDialog):
     def load_next_item(self):
         if not self.current_item_index:
             self.items = self.db_manager.get_items_by_group_name(self.group_name)
+            random.shuffle(self.items)
             if not self.items:  
                 self.current_group_label.setText("No items to learn in this group！")
                 self.step1_layout.setEnabled(False)
@@ -269,28 +280,29 @@ class StudyWindow(QDialog):
             self.progress_label.setText(f"Current item: {self.current_item_index}/{len(self.items)}")
 
             progress_value = int((self.current_item_index / len(self.items)) * 100)
-            self.progress_bar.setValue(progress_value)
-
+            #self.progress_bar.setValue(progress_value)
 
             if len(generated_sentences) >= 3 and len(translated_sentences) >= 3:
                 third_translated_sentence = translated_sentences[2] 
-
 
                 self.translated_sentence_label.setText(f"Please translate: {third_translated_sentence}")
                 self.translated_sentence_label.setStyleSheet("color: green;")
 
                 self.user_sentence_input.setPlaceholderText("Enter your Translation here")
-
+                self.user_sentence_input.clear()  
 
             self.generated_sentence_label.setText("")
             self.generated_sentence_label.setStyleSheet("")
+
+            # 更新当前 item 和句子的显示
+            self.current_item_label.setText(f"Current Item: {self.current_item['target_lang']}")
+            self.current_sentence_label.setText(f"Current Sentence: {generated_sentences[1]}")
 
             self.step1_layout.setEnabled(True)
             self.step2_layout.setEnabled(False)
             self.step3_layout.setEnabled(False)
             self.step4_layout.setEnabled(False)
             
-
             self.set_step_visible(1)
         else:
             self.current_group_label.setText("You have learned them all！")
@@ -334,7 +346,7 @@ class StudyWindow(QDialog):
         pygame.mixer.music.load(file_path)
         pygame.mixer.music.play()
         while pygame.mixer.music.get_busy():
-            time.sleep(1)
+            time.sleep(0.5)
         pygame.mixer.quit()
 
     def play_item_audio(self):
@@ -424,14 +436,37 @@ class RecordingThread(QThread):
         super().__init__()
         self.recording = False
         self.recorded_audio_path = "recorded_audio.wav"
+        self.stop_recording = False  # 添加一个标志变量
 
     def run(self):
         self.recording = True
         fs = 44100  # Sample rate
-        duration = 5  # Duration in seconds
-        myrecording = sd.rec(int(duration * fs), samplerate=fs, channels=2, dtype='int16')
-        sd.wait()  # Wait until recording is finished
-        sf.write(self.recorded_audio_path, myrecording, fs)
+        duration = 10  # longest recording duration in seconds
+        channels = 2  
+        dtype = 'int16'  # 数据类型
+
+        # 创建一个空的数组来存储录制的数据
+        myrecording = np.zeros((int(duration * fs), channels), dtype=dtype)
+
+        # 开始录制
+        with sd.InputStream(samplerate=fs, channels=channels, dtype=dtype) as stream:
+            start_time = time.time()
+            sample_count = 0  # 用于跟踪已录制的样本数量
+
+            while self.recording and time.time() - start_time < duration:
+                if self.stop_recording:
+                    break
+                data, _ = stream.read(fs)  # 每次读取一秒钟的数据
+                actual_samples = data.shape[0]  # 实际读取的样本数量
+
+                # 将数据复制到 myrecording 中
+                myrecording[sample_count:sample_count + actual_samples] = data[:actual_samples]
+
+                sample_count += actual_samples  # 更新已录制的样本数量
+
+        # 保存录制的音频
+        sf.write(self.recorded_audio_path, myrecording[:sample_count], fs)  # 只保存实际录制的部分
 
     def stop(self):
         self.recording = False
+        self.stop_recording = True

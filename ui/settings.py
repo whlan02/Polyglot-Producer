@@ -1,4 +1,5 @@
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QComboBox, QPushButton, QLabel, QLineEdit, QDesktopWidget
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QComboBox, QPushButton, QLabel, QLineEdit
+from PySide6.QtGui import QGuiApplication
 from core.database import DatabaseManager
 
 class SettingsWindow(QDialog):
@@ -44,16 +45,13 @@ class SettingsWindow(QDialog):
 
     def centerWindow(self):
         
-        screen_geometry = QDesktopWidget().availableGeometry()
-        screen_center = screen_geometry.center()
+        screen = QGuiApplication.primaryScreen().availableGeometry()
+        screen_center = screen.center()
 
        
         self.resize(400, 300)
-
         window_geometry = self.frameGeometry()
         window_geometry.moveCenter(screen_center)
-
-
         self.move(window_geometry.topLeft())
 
     def save_settings(self):

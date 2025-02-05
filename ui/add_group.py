@@ -1,4 +1,5 @@
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLineEdit, QPushButton, QLabel, QMessageBox, QDesktopWidget
+from PySide6.QtWidgets  import QDialog, QVBoxLayout, QLineEdit, QPushButton, QLabel, QMessageBox
+from PySide6.QtGui import QGuiApplication
 
 
 class AddGroupWindow(QDialog):
@@ -22,17 +23,13 @@ class AddGroupWindow(QDialog):
         self.setLayout(self.layout)
 
     def centerWindow(self):
+        # PySide6获取屏幕信息的新方式
+        screen = QGuiApplication.primaryScreen().availableGeometry()
+        screen_center = screen.center()
 
-        screen_geometry = QDesktopWidget().availableGeometry()
-        screen_center = screen_geometry.center()
-
-
-        self.resize(400, 200)
-        
+        self.resize(600, 400)
         window_geometry = self.frameGeometry()
         window_geometry.moveCenter(screen_center)
-
-
         self.move(window_geometry.topLeft())
 
     def add_group(self):
